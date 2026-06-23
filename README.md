@@ -8,7 +8,7 @@ It scans listening ports, groups them by process, highlights services that are p
 
 ## Features
 
-- Menu bar count of running developer services and probably stale services.
+- Menu bar live breakdown of running developer services, such as `Py 2 · Node 1`, plus probably stale services.
 - Compact sections for stale, running, and protected services.
 - Detail window with pid, command, cwd, port, HTTP probe, age, and classification reason.
 - Safety-aware stop controls:

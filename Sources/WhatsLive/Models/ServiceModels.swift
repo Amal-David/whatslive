@@ -24,6 +24,34 @@ enum ServiceKind: String, CaseIterable, Sendable {
         case .unknown: "questionmark.circle"
         }
     }
+
+    var compactLabel: String {
+        switch self {
+        case .node: "Node"
+        case .python: "Py"
+        case .rust: "Rust"
+        case .model: "Model"
+        case .docker: "Docker"
+        case .simulator: "Sim"
+        case .database: "DB"
+        case .system: "Sys"
+        case .unknown: "Other"
+        }
+    }
+
+    var summaryPriority: Int {
+        switch self {
+        case .python: 0
+        case .node: 1
+        case .rust: 2
+        case .model: 3
+        case .docker: 4
+        case .simulator: 5
+        case .unknown: 6
+        case .database: 7
+        case .system: 8
+        }
+    }
 }
 
 enum SafetyLevel: String, Sendable {
@@ -146,6 +174,37 @@ struct ServiceSnapshot: Sendable {
 
     var protectedCount: Int {
         services.filter { $0.safety == .protected || $0.status == .protected }.count
+    }
+
+    var liveKindCounts: [(kind: ServiceKind, count: Int)] {
+        Dictionary(grouping: visibleDevServices, by: \.kind)
+            .map { (kind: $0.key, count: $0.value.count) }
+            .filter { $0.count > 0 }
+            .sorted {
+                if $0.kind.summaryPriority != $1.kind.summaryPriority {
+                    return $0.kind.summaryPriority < $1.kind.summaryPriority
+                }
+                return $0.kind.rawValue < $1.kind.rawValue
+            }
+    }
+
+    func compactKindSummary(limit: Int = 2) -> String {
+        let counts = liveKindCounts
+        guard !counts.isEmpty else { return "Live 0" }
+        let visible = counts.prefix(limit).map { "\($0.kind.compactLabel) \($0.count)" }
+        let remaining = counts.dropFirst(limit).reduce(0) { $0 + $1.count }
+        if remaining > 0 {
+            return (visible + ["+\(remaining)"]).joined(separator: " · ")
+        }
+        return visible.joined(separator: " · ")
+    }
+
+    var fullKindSummary: String {
+        let counts = liveKindCounts
+        guard !counts.isEmpty else { return "No developer services" }
+        return counts
+            .map { "\($0.count) \($0.kind.rawValue)" }
+            .joined(separator: " · ")
     }
 }
 

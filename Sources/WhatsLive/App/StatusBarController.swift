@@ -32,12 +32,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     private func updateStatusLabel(_ snapshot: ServiceSnapshot) {
-        let count = snapshot.visibleDevServices.count
         if snapshot.staleCount > 0 {
-            statusItem.button?.title = "Live \(count) !\(snapshot.staleCount)"
+            statusItem.button?.title = "\(snapshot.compactKindSummary()) !\(snapshot.staleCount)"
             statusItem.button?.image = NSImage(systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: "Stale services")
         } else {
-            statusItem.button?.title = "Live \(count)"
+            statusItem.button?.title = snapshot.compactKindSummary()
             statusItem.button?.image = NSImage(systemSymbolName: "bolt.circle", accessibilityDescription: "What's Live")
         }
         rebuildMenu()
@@ -72,7 +71,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             return "What's Live - scanning"
         }
         let updated = store.snapshot.lastUpdated.map { TimeFormatters.shortDate($0) } ?? "never"
-        return "\(store.snapshot.visibleDevServices.count) services, \(store.snapshot.staleCount) stale - \(updated)"
+        return "\(store.snapshot.fullKindSummary), \(store.snapshot.staleCount) stale - \(updated)"
     }
 
     private func addSection(_ title: String, services: [RunningService]) {
