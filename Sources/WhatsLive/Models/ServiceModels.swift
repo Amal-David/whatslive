@@ -1,6 +1,7 @@
 import Foundation
 
 enum ServiceKind: String, CaseIterable, Sendable {
+    case monitor = "What's Live"
     case node = "Node"
     case python = "Python"
     case rust = "Rust"
@@ -13,6 +14,7 @@ enum ServiceKind: String, CaseIterable, Sendable {
 
     var symbolName: String {
         switch self {
+        case .monitor: "waveform.path.ecg"
         case .node: "hexagon"
         case .python: "curlybraces"
         case .rust: "hammer"
@@ -27,6 +29,7 @@ enum ServiceKind: String, CaseIterable, Sendable {
 
     var compactLabel: String {
         switch self {
+        case .monitor: "App"
         case .node: "Node"
         case .python: "Py"
         case .rust: "Rust"
@@ -41,6 +44,7 @@ enum ServiceKind: String, CaseIterable, Sendable {
 
     var summaryPriority: Int {
         switch self {
+        case .monitor: 9
         case .python: 0
         case .node: 1
         case .rust: 2
@@ -51,6 +55,63 @@ enum ServiceKind: String, CaseIterable, Sendable {
         case .database: 7
         case .system: 8
         }
+    }
+}
+
+enum HeatLevel: String, Sendable {
+    case cool = "Cool"
+    case warm = "Warm"
+    case hot = "Hot"
+    case unknown = "Unknown"
+
+    static func estimate(cpuPercent: Double?, status: String) -> HeatLevel {
+        guard let cpuPercent else { return .unknown }
+        if cpuPercent >= 75 { return .hot }
+        if cpuPercent >= 20 { return .warm }
+        if status.contains("R"), cpuPercent >= 5 { return .warm }
+        return .cool
+    }
+}
+
+struct ResourceUsage: Hashable, Sendable {
+    let cpuPercent: Double?
+    let residentMemoryBytes: Int64?
+    let heat: HeatLevel
+
+    static let unavailable = ResourceUsage(cpuPercent: nil, residentMemoryBytes: nil, heat: .unknown)
+
+    static func fromPS(cpuPercent: Double?, residentMemoryKilobytes: Int?, status: String) -> ResourceUsage {
+        let bytes = residentMemoryKilobytes.map { Int64($0) * 1_024 }
+        return ResourceUsage(
+            cpuPercent: cpuPercent,
+            residentMemoryBytes: bytes,
+            heat: HeatLevel.estimate(cpuPercent: cpuPercent, status: status)
+        )
+    }
+
+    var cpuText: String {
+        guard let cpuPercent else { return "CPU --" }
+        return String(format: "CPU %.1f%%", cpuPercent)
+    }
+
+    var memoryText: String {
+        guard let residentMemoryBytes else { return "Mem --" }
+        let mebibytes = Double(residentMemoryBytes) / 1_048_576
+        if mebibytes >= 1_024 {
+            return String(format: "%.1f GB", mebibytes / 1_024)
+        }
+        if mebibytes >= 100 {
+            return "\(Int(mebibytes.rounded())) MB"
+        }
+        return String(format: "%.1f MB", mebibytes)
+    }
+
+    var heatText: String {
+        heat == .unknown ? "Heat --" : "Heat \(heat.rawValue)"
+    }
+
+    var compactSummary: String {
+        "\(cpuText) - \(memoryText) - \(heatText)"
     }
 }
 
@@ -89,6 +150,27 @@ struct ProcessInfoSnapshot: Hashable, Sendable {
     let startDate: Date?
     let command: String
     let cwd: String?
+    let resourceUsage: ResourceUsage
+
+    init(
+        pid: Int,
+        parentPID: Int,
+        user: String,
+        status: String,
+        startDate: Date?,
+        command: String,
+        cwd: String?,
+        resourceUsage: ResourceUsage = .unavailable
+    ) {
+        self.pid = pid
+        self.parentPID = parentPID
+        self.user = user
+        self.status = status
+        self.startDate = startDate
+        self.command = command
+        self.cwd = cwd
+        self.resourceUsage = resourceUsage
+    }
 }
 
 struct DockerContainerSnapshot: Hashable, Sendable {
@@ -120,11 +202,54 @@ struct RunningService: Identifiable, Hashable, Sendable {
     let httpProbe: String?
     let dockerContainerID: String?
     let dockerStatus: String?
+    let resourceUsage: ResourceUsage
     let classificationReason: String
     let staleReasons: [String]
     let safety: SafetyLevel
     var status: ServiceStatus
     var killHistory: [KillEvent]
+
+    init(
+        id: String,
+        title: String,
+        kind: ServiceKind,
+        pid: Int?,
+        parentPID: Int?,
+        user: String,
+        command: String,
+        cwd: String?,
+        ports: [PortListener],
+        startDate: Date?,
+        httpProbe: String?,
+        dockerContainerID: String?,
+        dockerStatus: String?,
+        resourceUsage: ResourceUsage = .unavailable,
+        classificationReason: String,
+        staleReasons: [String],
+        safety: SafetyLevel,
+        status: ServiceStatus,
+        killHistory: [KillEvent]
+    ) {
+        self.id = id
+        self.title = title
+        self.kind = kind
+        self.pid = pid
+        self.parentPID = parentPID
+        self.user = user
+        self.command = command
+        self.cwd = cwd
+        self.ports = ports
+        self.startDate = startDate
+        self.httpProbe = httpProbe
+        self.dockerContainerID = dockerContainerID
+        self.dockerStatus = dockerStatus
+        self.resourceUsage = resourceUsage
+        self.classificationReason = classificationReason
+        self.staleReasons = staleReasons
+        self.safety = safety
+        self.status = status
+        self.killHistory = killHistory
+    }
 
     var isStale: Bool {
         status == .stale
@@ -165,7 +290,7 @@ struct ServiceSnapshot: Sendable {
     )
 
     var visibleDevServices: [RunningService] {
-        services.filter { $0.kind != .system && $0.kind != .database }
+        services.filter { $0.kind != .system && $0.kind != .database && $0.kind != .monitor }
     }
 
     var staleCount: Int {

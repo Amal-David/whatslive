@@ -108,7 +108,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     private func rowTitle(for service: RunningService) -> String {
         let status = service.status == .stale ? "stale" : service.status.rawValue.lowercased()
-        return "\(short(service.title, limit: 24)) :\(service.portSummary) - \(status)"
+        return "\(short(service.title, limit: 20)) :\(service.portSummary) - \(service.resourceUsage.compactSummary) - \(status)"
     }
 
     @objc private func refresh() {

@@ -23,7 +23,8 @@ final class SnapshotSummaryTests: XCTestCase {
         let snapshot = ServiceSnapshot(
             services: [
                 service(kind: .database),
-                service(kind: .system)
+                service(kind: .system),
+                service(kind: .monitor)
             ],
             lastUpdated: nil,
             isScanning: false,

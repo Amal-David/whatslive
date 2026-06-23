@@ -28,6 +28,17 @@ final class ParserTests: XCTestCase {
         XCTAssertNotNil(rows[1234]?.startDate)
     }
 
+    func testParsesProcessResourceUsage() {
+        let output = "1234 1 amal R Mon Jun 22 10:15:30 2026 20480 25.5 python app.py\n"
+
+        let rows = ServiceParsers.parsePS(output)
+
+        XCTAssertEqual(rows[1234]?.resourceUsage.cpuPercent, 25.5)
+        XCTAssertEqual(rows[1234]?.resourceUsage.residentMemoryBytes, 20_971_520)
+        XCTAssertEqual(rows[1234]?.resourceUsage.heat, .warm)
+        XCTAssertEqual(rows[1234]?.command, "python app.py")
+    }
+
     func testParsesDockerRows() {
         let rows = ServiceParsers.parseDockerPS("abc123\tapi\t0.0.0.0:8080->80/tcp\tUp 2 hours\n")
 

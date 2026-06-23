@@ -29,7 +29,8 @@ struct ServiceScanner: Sendable {
                         status: $0.status,
                         startDate: $0.startDate,
                         command: $0.command,
-                        cwd: cwd
+                        cwd: cwd,
+                        resourceUsage: $0.resourceUsage
                     )
                 }
             }
@@ -53,6 +54,10 @@ struct ServiceScanner: Sendable {
         if options.enableOllamaProbe {
             services.append(contentsOf: await loadOllamaServices())
         }
+        let currentPID = Int(ProcessInfo.processInfo.processIdentifier)
+        if !services.contains(where: { $0.pid == currentPID }) {
+            services.append(classifier.whatsLiveService(process: processMap[currentPID]))
+        }
 
         return services.sorted { lhs, rhs in
             if lhs.isStale != rhs.isStale { return lhs.isStale && !rhs.isStale }
@@ -68,7 +73,7 @@ struct ServiceScanner: Sendable {
     }
 
     private func loadPS() async throws -> [Int: ProcessInfoSnapshot] {
-        let result = try await runner.run("/bin/ps", arguments: ["-axo", "pid=,ppid=,user=,stat=,lstart=,command="])
+        let result = try await runner.run("/bin/ps", arguments: ["-axo", "pid=,ppid=,user=,stat=,lstart=,rss=,%cpu=,command="])
         return ServiceParsers.parsePS(result.stdout)
     }
 

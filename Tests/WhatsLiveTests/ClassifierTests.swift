@@ -77,6 +77,28 @@ final class ClassifierTests: XCTestCase {
         XCTAssertEqual(service?.status, .stale)
     }
 
+    func testWhatsLiveServiceIsVisibleButProtected() {
+        let process = ProcessInfoSnapshot(
+            pid: 400,
+            parentPID: 1,
+            user: NSUserName(),
+            status: "S",
+            startDate: Date(),
+            command: "/Users/amal/Applications/What's Live.app/Contents/MacOS/WhatsLive",
+            cwd: nil,
+            resourceUsage: ResourceUsage(cpuPercent: 0.2, residentMemoryBytes: 45_000_000, heat: .cool)
+        )
+
+        let service = classifier.whatsLiveService(process: process)
+
+        XCTAssertEqual(service.title, "What's Live")
+        XCTAssertEqual(service.kind, .monitor)
+        XCTAssertEqual(service.safety, .protected)
+        XCTAssertEqual(service.status, .running)
+        XCTAssertEqual(service.portSummary, "no port")
+        XCTAssertEqual(service.resourceUsage.cpuPercent, 0.2)
+    }
+
     private func options(includeAll: Bool = false) -> ScannerOptions {
         ScannerOptions(
             staleThreshold: 6 * 3600,

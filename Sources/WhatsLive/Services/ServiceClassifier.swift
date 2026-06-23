@@ -67,10 +67,37 @@ struct ServiceClassifier: Sendable {
             httpProbe: httpProbe,
             dockerContainerID: nil,
             dockerStatus: nil,
+            resourceUsage: process?.resourceUsage ?? .unavailable,
             classificationReason: classificationReason(kind: kind, command: command, httpProbe: httpProbe),
             staleReasons: staleReasons,
             safety: safety,
             status: status,
+            killHistory: []
+        )
+    }
+
+    func whatsLiveService(process: ProcessInfoSnapshot?) -> RunningService {
+        let pid = process?.pid ?? Int(ProcessInfo.processInfo.processIdentifier)
+        let command = process?.command ?? Bundle.main.executablePath ?? "WhatsLive"
+        return RunningService(
+            id: "process-\(pid)",
+            title: "What's Live",
+            kind: .monitor,
+            pid: pid,
+            parentPID: process?.parentPID,
+            user: process?.user ?? NSUserName(),
+            command: command,
+            cwd: Bundle.main.bundlePath,
+            ports: [],
+            startDate: process?.startDate,
+            httpProbe: nil,
+            dockerContainerID: nil,
+            dockerStatus: nil,
+            resourceUsage: process?.resourceUsage ?? .unavailable,
+            classificationReason: "Background menu bar monitor process.",
+            staleReasons: [],
+            safety: .protected,
+            status: .running,
             killHistory: []
         )
     }
@@ -90,6 +117,7 @@ struct ServiceClassifier: Sendable {
             httpProbe: nil,
             dockerContainerID: container.id,
             dockerStatus: container.status,
+            resourceUsage: .unavailable,
             classificationReason: "Docker container from docker ps.",
             staleReasons: [],
             safety: .confirm,
@@ -113,6 +141,7 @@ struct ServiceClassifier: Sendable {
             httpProbe: nil,
             dockerContainerID: nil,
             dockerStatus: "\(model.processor), until \(model.until)",
+            resourceUsage: .unavailable,
             classificationReason: "Running Ollama model.",
             staleReasons: [],
             safety: .confirm,
@@ -152,6 +181,8 @@ struct ServiceClassifier: Sendable {
 
     private func safetyFor(kind: ServiceKind) -> SafetyLevel {
         switch kind {
+        case .monitor:
+            return .protected
         case .node, .python, .rust:
             return .safe
         case .model, .docker, .simulator, .unknown:

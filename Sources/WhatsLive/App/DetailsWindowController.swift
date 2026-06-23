@@ -38,7 +38,7 @@ final class DetailsWindowController: NSWindowController, NSTableViewDataSource, 
         splitView.setPosition(230, ofDividerAt: 0)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 540),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -80,7 +80,7 @@ final class DetailsWindowController: NSWindowController, NSTableViewDataSource, 
             ])
         }
         let service = services[row]
-        cell.textField?.stringValue = "\(service.title) :\(service.portSummary)"
+        cell.textField?.stringValue = "\(service.title) :\(service.portSummary) - \(service.resourceUsage.cpuText) - \(service.resourceUsage.memoryText)"
         return cell
     }
 
@@ -119,9 +119,15 @@ final class DetailsWindowController: NSWindowController, NSTableViewDataSource, 
         Ports: \(service.ports.map { "\($0.displayAddress):\($0.port)" }.joined(separator: ", "))
         HTTP: \(service.httpProbe ?? "not detected")
         Age: \(TimeFormatters.shortDate(service.startDate))
-        CWD: \(pathDisplay(service.cwd))
+        CWD / Location: \(pathDisplay(service.cwd))
         Safety: \(service.safety.rawValue)
         Docker: \(service.dockerStatus ?? "none")
+
+        Resources:
+        \(service.resourceUsage.cpuText)
+        Memory: \(service.resourceUsage.memoryText)
+        \(service.resourceUsage.heatText)
+        Heat source: per-process CPU estimate; system thermal state is \(systemThermalState())
 
         Command:
         \(service.command)
@@ -135,5 +141,20 @@ final class DetailsWindowController: NSWindowController, NSTableViewDataSource, 
         Kill history:
         \(service.killHistory.isEmpty ? "none" : service.killHistory.map { "\(TimeFormatters.shortDate($0.date)): \($0.message)" }.joined(separator: "\n"))
         """
+    }
+
+    private func systemThermalState() -> String {
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal:
+            return "Nominal"
+        case .fair:
+            return "Fair"
+        case .serious:
+            return "Serious"
+        case .critical:
+            return "Critical"
+        @unknown default:
+            return "Unknown"
+        }
     }
 }
