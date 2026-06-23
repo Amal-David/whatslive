@@ -11,14 +11,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     init(store: ServiceStore) {
         self.store = store
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
         menu.delegate = self
         statusItem.menu = menu
-        statusItem.button?.image = NSImage(systemSymbolName: "bolt.circle", accessibilityDescription: "What's Live")
-        statusItem.button?.title = "Live"
-        statusItem.button?.imagePosition = .imageLeading
+        statusItem.isVisible = true
+        statusItem.autosaveName = "com.amal.whatslive.status-item"
+        statusItem.button?.image = statusIcon(staleCount: 0)
+        statusItem.button?.title = ""
+        statusItem.button?.imagePosition = .imageOnly
+        statusItem.button?.toolTip = "What's Live"
 
         observerID = store.observe { [weak self] snapshot in
             self?.updateStatusLabel(snapshot)
@@ -32,14 +35,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     private func updateStatusLabel(_ snapshot: ServiceSnapshot) {
-        if snapshot.staleCount > 0 {
-            statusItem.button?.title = "\(snapshot.compactKindSummary()) !\(snapshot.staleCount)"
-            statusItem.button?.image = NSImage(systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: "Stale services")
-        } else {
-            statusItem.button?.title = snapshot.compactKindSummary()
-            statusItem.button?.image = NSImage(systemSymbolName: "bolt.circle", accessibilityDescription: "What's Live")
-        }
+        statusItem.button?.title = ""
+        statusItem.button?.image = statusIcon(staleCount: snapshot.staleCount)
+        statusItem.button?.toolTip = "What's Live: \(snapshot.fullKindSummary)"
         rebuildMenu()
+    }
+
+    private func statusIcon(staleCount: Int) -> NSImage? {
+        let symbolName = staleCount > 0 ? "exclamationmark.circle.fill" : "waveform.path.ecg"
+        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "What's Live")
+        image?.isTemplate = true
+        return image
     }
 
     private func rebuildMenu() {
