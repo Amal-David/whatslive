@@ -1,32 +1,32 @@
 import Foundation
 
 @MainActor
-final class AppPreferences: ObservableObject {
-    @Published var staleThresholdHours: Double {
+final class AppPreferences {
+    var staleThresholdHours: Double {
         didSet { defaults.set(staleThresholdHours, forKey: Keys.staleThresholdHours) }
     }
 
-    @Published var scanIntervalSeconds: Double {
+    var scanIntervalSeconds: Double {
         didSet { defaults.set(scanIntervalSeconds, forKey: Keys.scanIntervalSeconds) }
     }
 
-    @Published var includeAllListeners: Bool {
+    var includeAllListeners: Bool {
         didSet { defaults.set(includeAllListeners, forKey: Keys.includeAllListeners) }
     }
 
-    @Published var enableDockerProbe: Bool {
+    var enableDockerProbe: Bool {
         didSet { defaults.set(enableDockerProbe, forKey: Keys.enableDockerProbe) }
     }
 
-    @Published var enableOllamaProbe: Bool {
+    var enableOllamaProbe: Bool {
         didSet { defaults.set(enableOllamaProbe, forKey: Keys.enableOllamaProbe) }
     }
 
-    @Published var ignoredPortsText: String {
+    var ignoredPortsText: String {
         didSet { defaults.set(ignoredPortsText, forKey: Keys.ignoredPortsText) }
     }
 
-    @Published var protectedNamesText: String {
+    var protectedNamesText: String {
         didSet { defaults.set(protectedNamesText, forKey: Keys.protectedNamesText) }
     }
 

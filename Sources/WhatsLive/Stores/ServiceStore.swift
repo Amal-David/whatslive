@@ -1,12 +1,11 @@
-import Combine
 import Foundation
 
 @MainActor
-final class ServiceStore: ObservableObject {
-    @Published private(set) var snapshot = ServiceSnapshot.empty
-    @Published var selectedServiceID: RunningService.ID?
-    @Published var pendingKillService: RunningService?
-    @Published var pendingForceService: RunningService?
+final class ServiceStore {
+    private(set) var snapshot = ServiceSnapshot.empty {
+        didSet { notifyObservers() }
+    }
+    var selectedServiceID: RunningService.ID?
 
     let preferences: AppPreferences
 
@@ -14,6 +13,7 @@ final class ServiceStore: ObservableObject {
     private let stopper: ServiceStopper
     private var scanTask: Task<Void, Never>?
     private var historyByID: [RunningService.ID: [KillEvent]] = [:]
+    private var observers: [UUID: (ServiceSnapshot) -> Void] = [:]
 
     init(
         preferences: AppPreferences = AppPreferences(),
@@ -33,6 +33,18 @@ final class ServiceStore: ObservableObject {
     var selectedService: RunningService? {
         guard let selectedServiceID else { return snapshot.services.first }
         return snapshot.services.first { $0.id == selectedServiceID }
+    }
+
+    @discardableResult
+    func observe(_ observer: @escaping (ServiceSnapshot) -> Void) -> UUID {
+        let id = UUID()
+        observers[id] = observer
+        observer(snapshot)
+        return id
+    }
+
+    func removeObserver(_ id: UUID) {
+        observers[id] = nil
     }
 
     func startPolling() {
@@ -88,41 +100,34 @@ final class ServiceStore: ObservableObject {
         }
     }
 
-    func requestStop(_ service: RunningService) {
-        let plan = KillPlanner.plan(for: service)
-        if plan.requiresConfirmation {
-            pendingKillService = service
-        } else {
-            Task { await stop(service, force: false) }
-        }
-    }
-
-    func stop(_ service: RunningService, force: Bool) async {
+    @discardableResult
+    func stop(_ service: RunningService, force: Bool) async -> Result<Void, Error> {
         let plan = KillPlanner.plan(for: service, force: force)
         do {
             try await stopper.stop(using: plan)
             appendHistory("Sent \(force ? "SIGKILL" : "SIGTERM")", for: service.id)
-            pendingKillService = nil
-            pendingForceService = nil
             try? await Task.sleep(for: .milliseconds(700))
             await refresh()
-            if !force, let updated = snapshot.services.first(where: { $0.id == service.id }) {
-                pendingForceService = updated
-            }
+            return .success(())
         } catch {
             appendHistory("Stop failed: \(error.localizedDescription)", for: service.id)
-            pendingKillService = nil
-            pendingForceService = nil
             snapshot = ServiceSnapshot(
                 services: snapshot.services,
                 lastUpdated: snapshot.lastUpdated,
                 isScanning: false,
                 errorMessage: error.localizedDescription
             )
+            return .failure(error)
         }
     }
 
     private func appendHistory(_ message: String, for id: RunningService.ID) {
         historyByID[id, default: []].insert(KillEvent(date: Date(), message: message), at: 0)
+    }
+
+    private func notifyObservers() {
+        for observer in observers.values {
+            observer(snapshot)
+        }
     }
 }

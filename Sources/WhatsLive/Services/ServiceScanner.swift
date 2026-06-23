@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 struct ServiceScanner: Sendable {
@@ -79,16 +80,8 @@ struct ServiceScanner: Sendable {
 
     private func probeHTTP(ports: [PortListener]) async -> String? {
         for listener in ports where listener.address == "127.0.0.1" || listener.address == "localhost" || listener.address == "*" {
-            guard let url = URL(string: "http://127.0.0.1:\(listener.port)") else { continue }
-            var request = URLRequest(url: url, timeoutInterval: 0.6)
-            request.httpMethod = "HEAD"
-            do {
-                let (_, response) = try await URLSession.shared.data(for: request)
-                if let http = response as? HTTPURLResponse {
-                    return "HTTP \(http.statusCode)"
-                }
-            } catch {
-                continue
+            if let status = await HTTPHeadProbe.statusCode(port: listener.port) {
+                return "HTTP \(status)"
             }
         }
         return nil
@@ -114,5 +107,48 @@ struct ServiceScanner: Sendable {
               result.status == 0
         else { return [] }
         return ServiceParsers.parseOllamaPS(result.stdout).map(classifier.ollamaService(from:))
+    }
+}
+
+private enum HTTPHeadProbe {
+    static func statusCode(port: Int) async -> Int? {
+        await Task.detached(priority: .utility) {
+            let descriptor = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+            guard descriptor >= 0 else { return nil }
+            defer { close(descriptor) }
+
+            var timeout = timeval(tv_sec: 0, tv_usec: 500_000)
+            setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+            setsockopt(descriptor, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+
+            var address = sockaddr_in()
+            address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+            address.sin_family = sa_family_t(AF_INET)
+            address.sin_port = in_port_t(port).bigEndian
+            inet_pton(AF_INET, "127.0.0.1", &address.sin_addr)
+
+            let connected = withUnsafePointer(to: &address) { pointer in
+                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { socketAddress in
+                    connect(descriptor, socketAddress, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
+            }
+            guard connected == 0 else { return nil }
+
+            let request = "HEAD / HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+            let sent = request.withCString { bytes in
+                send(descriptor, bytes, strlen(bytes), 0)
+            }
+            guard sent > 0 else { return nil }
+
+            var buffer = [UInt8](repeating: 0, count: 128)
+            let received = recv(descriptor, &buffer, buffer.count, 0)
+            guard received > 0,
+                  let response = String(bytes: buffer.prefix(received), encoding: .utf8)
+            else { return nil }
+
+            let parts = response.split(whereSeparator: \.isWhitespace)
+            guard parts.count >= 2 else { return nil }
+            return Int(parts[1])
+        }.value
     }
 }
