@@ -1,6 +1,6 @@
 # What's Live
 
-![What's Live logo](Assets/WhatsLiveLogo.png)
+<img src="Assets/WhatsLiveLogo.png" alt="What's Live logo" width="140">
 
 What's Live is a small macOS menu bar app for seeing what local development services are currently running.
 
