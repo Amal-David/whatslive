@@ -178,6 +178,21 @@ struct DockerContainerSnapshot: Hashable, Sendable {
     let name: String
     let ports: String
     let status: String
+    let resourceUsage: ResourceUsage
+
+    init(
+        id: String,
+        name: String,
+        ports: String,
+        status: String,
+        resourceUsage: ResourceUsage = .unavailable
+    ) {
+        self.id = id
+        self.name = name
+        self.ports = ports
+        self.status = status
+        self.resourceUsage = resourceUsage
+    }
 }
 
 struct OllamaModelSnapshot: Hashable, Sendable {

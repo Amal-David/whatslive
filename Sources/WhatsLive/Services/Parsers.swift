@@ -101,6 +101,22 @@ enum ServiceParsers {
             }
     }
 
+    static func parseDockerStats(_ output: String) -> [String: ResourceUsage] {
+        var usageByID: [String: ResourceUsage] = [:]
+        for line in output.split(whereSeparator: \.isNewline) {
+            let parts = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count >= 3, !parts[0].isEmpty else { continue }
+            let cpuPercent = parsePercent(parts[1])
+            let memoryBytes = parseDockerMemoryBytes(parts[2])
+            usageByID[parts[0]] = ResourceUsage(
+                cpuPercent: cpuPercent,
+                residentMemoryBytes: memoryBytes,
+                heat: HeatLevel.estimate(cpuPercent: cpuPercent, status: "S")
+            )
+        }
+        return usageByID
+    }
+
     static func parseOllamaPS(_ output: String) -> [OllamaModelSnapshot] {
         output
             .split(whereSeparator: \.isNewline)
@@ -122,5 +138,29 @@ enum ServiceParsers {
         guard let port = Int(portText) else { return nil }
         let address = String(cleanedName[..<separator])
         return PortListener(address: address, port: port, rawName: cleanedName)
+    }
+
+    private static func parsePercent(_ text: String) -> Double? {
+        Double(text.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func parseDockerMemoryBytes(_ text: String) -> Int64? {
+        let usedMemory = text.components(separatedBy: "/").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? text
+        let units: [(suffix: String, multiplier: Double)] = [
+            ("KiB", 1_024),
+            ("MiB", 1_048_576),
+            ("GiB", 1_073_741_824),
+            ("TiB", 1_099_511_627_776),
+            ("kB", 1_000),
+            ("MB", 1_000_000),
+            ("GB", 1_000_000_000),
+            ("B", 1)
+        ]
+        guard let unit = units.first(where: { usedMemory.hasSuffix($0.suffix) }) else { return nil }
+        let numberText = usedMemory
+            .dropLast(unit.suffix.count)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Double(numberText) else { return nil }
+        return Int64(value * unit.multiplier)
     }
 }

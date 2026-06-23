@@ -47,6 +47,14 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(rows.first?.ports, "0.0.0.0:8080->80/tcp")
     }
 
+    func testParsesDockerStatsRows() {
+        let rows = ServiceParsers.parseDockerStats("abc123\t4.50%\t128.5MiB / 7.7GiB\n")
+
+        XCTAssertEqual(rows["abc123"]?.cpuPercent, 4.5)
+        XCTAssertEqual(rows["abc123"]?.residentMemoryBytes, 134_742_016)
+        XCTAssertEqual(rows["abc123"]?.heat, .cool)
+    }
+
     func testParsesOllamaRows() {
         let output = """
         NAME ID SIZE PROCESSOR UNTIL

@@ -117,7 +117,7 @@ struct ServiceClassifier: Sendable {
             httpProbe: nil,
             dockerContainerID: container.id,
             dockerStatus: container.status,
-            resourceUsage: .unavailable,
+            resourceUsage: container.resourceUsage,
             classificationReason: "Docker container from docker ps.",
             staleReasons: [],
             safety: .confirm,

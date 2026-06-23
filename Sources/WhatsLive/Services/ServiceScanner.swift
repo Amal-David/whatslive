@@ -100,7 +100,27 @@ struct ServiceScanner: Sendable {
         guard let result = try? await runner.run(dockerPath, arguments: ["ps", "--format", "{{.ID}}\t{{.Names}}\t{{.Ports}}\t{{.Status}}"]),
               result.status == 0
         else { return [] }
-        return ServiceParsers.parseDockerPS(result.stdout).map(classifier.dockerService(from:))
+        let usageByID = await loadDockerStats(dockerPath: dockerPath)
+        let containers = ServiceParsers.parseDockerPS(result.stdout).map { container in
+            DockerContainerSnapshot(
+                id: container.id,
+                name: container.name,
+                ports: container.ports,
+                status: container.status,
+                resourceUsage: usageByID[container.id] ?? .unavailable
+            )
+        }
+        return containers.map(classifier.dockerService(from:))
+    }
+
+    private func loadDockerStats(dockerPath: String) async -> [String: ResourceUsage] {
+        guard let result = try? await runner.run(
+            dockerPath,
+            arguments: ["stats", "--no-stream", "--format", "{{.ID}}\t{{.CPUPerc}}\t{{.MemUsage}}"]
+        ),
+            result.status == 0
+        else { return [:] }
+        return ServiceParsers.parseDockerStats(result.stdout)
     }
 
     private func loadOllamaServices() async -> [RunningService] {
