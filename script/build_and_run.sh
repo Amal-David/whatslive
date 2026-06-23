@@ -6,6 +6,7 @@ APP_NAME="WhatsLive"
 BUNDLE_ID="com.amal.whatslive"
 DISPLAY_NAME="What's Live"
 MIN_SYSTEM_VERSION="14.0"
+BUILD_CONFIGURATION="${BUILD_CONFIGURATION:-debug}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -19,8 +20,8 @@ APP_ICON="$ROOT_DIR/Resources/AppIcon.icns"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
-swift build
-BUILD_BINARY="$(swift build --show-bin-path)/$APP_NAME"
+swift build -c "$BUILD_CONFIGURATION"
+BUILD_BINARY="$(swift build -c "$BUILD_CONFIGURATION" --show-bin-path)/$APP_NAME"
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$RESOURCES_DIR"

@@ -6,7 +6,7 @@ APP_NAME="WhatsLive"
 DISPLAY_NAME="What's Live"
 INSTALL_DIR="${WHATSLIVE_INSTALL_DIR:-$HOME/Applications}"
 
-"$ROOT_DIR/script/build_and_run.sh" --verify
+BUILD_CONFIGURATION=release "$ROOT_DIR/script/build_and_run.sh" --verify
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
 mkdir -p "$INSTALL_DIR"
